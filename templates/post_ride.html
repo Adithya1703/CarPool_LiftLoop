@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Post a Ride</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+        form { margin: auto; width: 300px; }
+        input, button { width: 100%; margin: 10px 0; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h2>Post a Ride</h2>
+    <form method="POST" action="/post_ride">
+        <input type="text" name="source" placeholder="Source Location" required>
+        <input type="text" name="destination" placeholder="Destination Location" required>
+        <button type="submit">Post Ride</button>
+    </form>
+    <a href="/app/main">Back to Dashboard</a>
+</body>
+</html>

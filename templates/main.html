@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        nav { background: teal; color: white; padding: 10px; }
+        nav a { color: white; margin: 10px; text-decoration: none; }
+        .container { margin: 20px; }
+
+        /* Floating button styles */
+        .floating-buttons {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+        .floating-buttons button {
+            background-color: orange;
+            border: none;
+            color: white;
+            width: 50px;
+            height: 50px;
+            margin: 10px 0;
+            border-radius: 50%;
+            font-size: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+        }
+        .floating-buttons button:hover {
+            background-color: darkorange;
+        }
+        .floating-buttons i {
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <strong>{{ user.name }}</strong> | <a href="/profile">Profile</a> | <a href="/find_ride">Find a Ride</a> | <a href="/logout">Logout</a>
+    </nav>
+    <div class="container">
+        <h2>Welcome to TechieRide</h2>
+        <p>No Ride History Available</p>
+    </div>
+
+    <!-- Floating Action Buttons -->
+    <div class="floating-buttons">
+        <button onclick="postRide()" title="Post a Ride">
+            <i>🚗</i>
+        </button>
+        <button onclick="searchRide()" title="Search for Rides">
+            <i>🔍</i>
+        </button>
+        <button onclick="addNew()" title="Add New">
+            <i>➕</i>
+        </button>
+    </div>
+
+    <script>
+        function postRide() {
+            window.location.href = "/post_ride"; // Redirect to Post a Ride page
+        }
+        function searchRide() {
+            window.location.href = "/find_ride"; // Redirect to Find a Ride page
+        }
+        function addNew() {
+            alert("Feature coming soon!"); // Placeholder for additional functionality
+        }
+    </script>
+</body>
+</html>
