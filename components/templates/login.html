@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TechieRide - Login</title>
+    <script defer src="https://pyscript.net/alpha/pyscript.js"></script>
+    <link rel="stylesheet" href="https://pyscript.net/alpha/pyscript.css">
+    <style>
+        body {
+            background: linear-gradient(to bottom, #a9d8f3, #ffffff);
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        .form-container {
+            margin: 100px auto;
+            padding: 20px;
+            width: 300px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        }
+        .form-container input {
+            width: 100%;
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .form-container button {
+            background-color: #28a745;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+        }
+        .form-container button:hover {
+            background-color: #218838;
+        }
+        .error {
+            color: red;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h2>Login</h2>
+        <form id="loginForm">
+            <input type="text" id="mobileNumber" placeholder="Mobile Number *" maxlength="10">
+            <input type="password" id="password" placeholder="Password *">
+            <p id="error" class="error"></p>
+            <button type="button" id="loginBtn">LOGIN</button>
+        </form>
+        <p>
+            <a href="/signup">SignUp</a> | <a href="/forgot-password">Forgot Password?</a>
+        </p>
+    </div>
+
+    <py-script>
+        from js import document, console, fetch
+        from pyscript import display
+
+        def login():
+            mobile_number = document.getElementById("mobileNumber").value
+            password = document.getElementById("password").value
+            error_element = document.getElementById("error")
+
+            if not mobile_number or not password:
+                error_element.textContent = "Mobile Number and Password are required."
+                return
+
+            fetch("/login", {
+                "method": "POST",
+                "headers": {"Content-Type": "application/x-www-form-urlencoded"},
+                "body": f"mobileNumber={mobile_number}&password={password}",
+            }).then(
+                lambda response: response.json().then(
+                    lambda data: (
+                        error_element.textContent = ""
+                        if "message" in data
+                        else setattr(error_element, "textContent", data["error"])
+                    )
+                )
+            ).catch(
+                lambda error: setattr(error_element, "textContent", "Network error occurred.")
+            )
+
+        document.getElementById("loginBtn").addEventListener("click", login)
+    </py-script>
+</body>
+</html>
