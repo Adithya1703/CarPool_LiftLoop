@@ -41,6 +41,20 @@ def main_page():
 
         main_pd["via_routes"] = main_pd["via_routes"].apply(parse_via_routes)
 
+        # Add logic to format time with AM/PM
+        def format_time_with_ampm(time_str):
+            try:
+                # Parse the time string in HH:mm format
+                hour, minute = map(int, time_str.split(":"))
+                am_pm = "AM" if hour < 12 else "PM"
+                hour = hour % 12 if hour != 12 else 12  # Convert to 12-hour format
+                return f"{hour}:{minute:02d} {am_pm}"
+            except ValueError:
+                return time_str  # Return as is if parsing fails
+
+        # Apply formatting to the `preferred_start_time` column
+        main_pd["preferred_start_time"] = main_pd["preferred_start_time"].apply(format_time_with_ampm)
+
         # Filter rides for the logged-in user
         user_rides = main_pd[main_pd["ride_provider"] == logged_in_user].to_dict(orient="records")
 
@@ -48,7 +62,6 @@ def main_page():
         user_rides = []
 
     return render_template("main.html", user=session["user"], rides=user_rides)
-
 
 @app.route("/login", methods=["POST"])
 def login():
@@ -286,9 +299,22 @@ def admin_dashboard():
         users_data = []
         flash(f"Error loading profiles: {e}", "danger")
 
-    # Load ride data
+    # Load ride data and ensure `via_routes` is parsed correctly
     try:
         ride_df = pd.read_excel(ride_excel)
+
+        # Ensure `via_routes` is correctly parsed as a list
+        def parse_via_routes(value):
+            if pd.isna(value):
+                return []  # Return an empty list if the value is NaN
+            if isinstance(value, str):
+                try:
+                    return json.loads(value)  # Attempt to parse as JSON
+                except json.JSONDecodeError:
+                    return [value.strip()]  # Treat as a single-item list if parsing fails
+            return value  # Return as is if already a list
+
+        ride_df["via_routes"] = ride_df["via_routes"].apply(parse_via_routes)
         rides_data = ride_df.to_dict(orient="records")
     except Exception as e:
         rides_data = []
@@ -297,14 +323,57 @@ def admin_dashboard():
     return render_template("admin_dashboard.html", users=users_data, rides=rides_data)
 
 
-# Route for finding a ride
 @app.route("/find_ride", methods=["GET", "POST"])
 def find_ride():
+    if "user" not in session:
+        return redirect(url_for("login"))  # Redirect to login if not logged in
+
+    query = request.args.get("query")  # Get the search query
+    selected_rides = request.form.getlist("selected_rides")  # Get selected rides for request
+    rides_data = []
+
+    try:
+        # Load ride data from Excel
+        ride_df = pd.read_excel(ride_excel)
+
+        # Parse the "via_routes" column into a list
+        def parse_via_routes(value):
+            if pd.isna(value):
+                return []
+            try:
+                return eval(value)  # Convert string to list
+            except:
+                return [value]
+
+        ride_df["via_routes"] = ride_df["via_routes"].apply(parse_via_routes)
+
+        # Rename `preferred_start_time` to `start_time` to match frontend reference
+        if "preferred_start_time" in ride_df.columns:
+            ride_df.rename(columns={"preferred_start_time": "start_time"}, inplace=True)
+
+        if query:
+            # Filter rides based on query
+            rides_data = ride_df[
+                (ride_df["start_location"].str.contains(query, case=False, na=False)) |
+                (ride_df["destination"].str.contains(query, case=False, na=False)) |
+                (ride_df["via_routes"].apply(lambda routes: any(query.lower() in route.lower() for route in routes)))
+            ].to_dict(orient="records")
+        else:
+            # If no query, show all rides
+            rides_data = ride_df.to_dict(orient="records")
+    except FileNotFoundError:
+        flash("Ride data not found!", "danger")
+
+    # Handle ride requests
     if request.method == "POST":
-        search_query = request.form.get("search")
-        # For now, return the search query as a placeholder
-        return jsonify({"message": f"Search results for {search_query}"})
-    return render_template("find_ride.html")
+        if selected_rides:
+            flash(f"You have requested the following rides: {', '.join(selected_rides)}", "success")
+        else:
+            flash("No rides selected!", "warning")
+
+    return render_template("find_ride.html", rides=rides_data)
+
+
 
 @app.route("/post_ride", methods=["GET", "POST"])
 def post_ride():
@@ -315,7 +384,21 @@ def post_ride():
         start_location = request.form.get('start_location')
         destination = request.form.get('destination')
         via_routes = request.form.getlist('via_routes')
-        preferred_start_time = f"{request.form.get('hour')}:{request.form.get('minute')}"
+
+        # Convert hour and minute to integers
+        hour = int(request.form.get('hour')) if request.form.get('hour') else 0
+        minute = int(request.form.get('minute')) if request.form.get('minute') else 0
+        ampm = request.form.get('ampm')  # Get AM/PM value
+
+        # Convert to 24-hour format
+        if ampm == "PM" and hour != 12:
+            hour += 12
+        elif ampm == "AM" and hour == 12:
+            hour = 0
+
+        # Format time as HH:mm
+        preferred_start_time = f"{hour:02}:{minute:02}"
+
         seats_available = request.form.get('seats_available')
         ride_provider = session["user"]["name"]
 
@@ -350,7 +433,6 @@ def post_ride():
             return f"An error occurred while saving ride details: {str(e)}"
 
         return redirect(url_for('main_page'))
-        return redirect(url_for('admin_dashboard'))
 
     return render_template('post_ride.html')
 

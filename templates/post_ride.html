@@ -124,27 +124,37 @@
                 </div>
             </div>
 
-            <div class="form-group">
-                <label for="preferred_start_time">Preferred Starting Time:</label>
-                <div class="time-picker-container">
-                    <select name="hour" required>
-                        <option value="" disabled selected>Hour (0-23)</option>
-                        <script>
-                            for (let hour = 0; hour < 24; hour++) {
-                                document.write(`<option value="${hour}">${hour.toString().padStart(2, '0')}</option>`);
-                            }
-                        </script>
-                    </select>
-                    <select name="minute" required>
-                        <option value="" disabled selected>Minute (0-59)</option>
-                        <script>
-                            for (let minute = 0; minute < 60; minute++) {
-                                document.write(`<option value="${minute}">${minute.toString().padStart(2, '0')}</option>`);
-                            }
-                        </script>
-                    </select>
-                </div>
-            </div>
+<div class="form-group">
+    <label for="preferred_start_time">Preferred Starting Time:</label>
+    <div class="time-picker-container">
+        <!-- Hour Selector -->
+        <select name="hour" required>
+            <option value="" disabled selected>Hour (1-12)</option>
+            <script>
+                for (let hour = 1; hour <= 12; hour++) {
+                    document.write(`<option value="${hour}">${hour.toString().padStart(2, '0')}</option>`);
+                }
+            </script>
+        </select>
+
+        <!-- Minute Selector -->
+        <select name="minute" required>
+            <option value="" disabled selected>Minute (0-59)</option>
+            <script>
+                for (let minute = 0; minute < 60; minute++) {
+                    document.write(`<option value="${minute}">${minute.toString().padStart(2, '0')}</option>`);
+                }
+            </script>
+        </select>
+
+        <!-- AM/PM Selector -->
+        <select name="ampm" required>
+            <option value="" disabled selected>AM/PM</option>
+            <option value="AM">AM</option>
+            <option value="PM">PM</option>
+        </select>
+    </div>
+</div>
 
             <div class="form-group">
                 <label for="seats_available">Seats Available:</label>
