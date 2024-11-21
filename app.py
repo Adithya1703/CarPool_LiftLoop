@@ -1,12 +1,16 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
 import pandas as pd
 import os
 import bcrypt
+import json
 
 app = Flask(__name__)
 # Path to Excel file
 EXCEL_FILE = "users_data.xlsx"
 app.secret_key = "0123456789"
+ADMIN_PASSWORD = "admin123"
+ride_excel = "ride_excel.xlsx"
+rides =[]
 
 @app.route("/")
 def home():
@@ -15,8 +19,36 @@ def home():
 @app.route('/main_page')
 def main_page():
     if "user" not in session:
-        return redirect(url_for("login"))  # Redirect to login if not logged in
-    return render_template("main.html", user=session["user"])
+        return redirect(url_for("login"))
+
+    logged_in_user = session["user"]["name"]
+
+    try:
+        main_pd = pd.read_excel(ride_excel)
+
+        # Ensure `via_routes` is correctly parsed as a list
+        def parse_via_routes(value):
+            if pd.isna(value):
+                return []  # Return empty list if the value is NaN
+            if isinstance(value, str):
+                try:
+                    # Attempt to parse as JSON
+                    return json.loads(value)
+                except json.JSONDecodeError:
+                    # If JSON decoding fails, return as a single-item list
+                    return [value.strip()]
+            return value  # Return as is for already valid lists
+
+        main_pd["via_routes"] = main_pd["via_routes"].apply(parse_via_routes)
+
+        # Filter rides for the logged-in user
+        user_rides = main_pd[main_pd["ride_provider"] == logged_in_user].to_dict(orient="records")
+
+    except FileNotFoundError:
+        user_rides = []
+
+    return render_template("main.html", user=session["user"], rides=user_rides)
+
 
 @app.route("/login", methods=["POST"])
 def login():
@@ -115,19 +147,24 @@ def signup():
 
 @app.route("/profile", methods=["GET", "POST"])
 def profile():
+    # Ensure the user is logged in
     if "user" not in session:
         return redirect("/")
 
-    if request.method == "POST":
-        try:
-            # Load the Excel file
-            df = pd.read_excel(EXCEL_FILE)
+    try:
+        # Load the Excel file
+        df = pd.read_excel(EXCEL_FILE)
+        email = session["user"]["email"]
 
-            # Find the user's row based on email
-            email = session["user"]["email"]
+        if request.method == "POST":
+            # Find the user's row in the Excel file
             user_index = df[df["Official Email"] == email].index[0]
 
-            # Update the user's details
+            # Ensure Mobile Number column is treated as a string
+            if "Mobile Number" in df.columns:
+                df["Mobile Number"] = df["Mobile Number"].astype(str)
+
+            # Update user details
             df.at[user_index, "Name"] = request.form.get("name")
             df.at[user_index, "Gender"] = request.form.get("gender")
             df.at[user_index, "Date of Birth"] = request.form.get("dob")
@@ -135,42 +172,104 @@ def profile():
             df.at[user_index, "Mobile Number"] = request.form.get("phone")
             df.at[user_index, "Emergency Contact"] = request.form.get("emergencyContact")
 
-            # Save the updated data to the Excel file
+            # Handle vehicles
+            vehicle_names = request.form.getlist("vehicleName[]")
+            vehicle_types = request.form.getlist("vehicleType[]")
+            number_plates = request.form.getlist("numberPlate[]")
+            vehicles = [{"name": n, "type": t, "numberPlate": p} for n, t, p in zip(vehicle_names, vehicle_types, number_plates)]
+            df.at[user_index, "Vehicles"] = str(vehicles)  # Store as a JSON string
+
+            # Save changes to the Excel file
             df.to_excel(EXCEL_FILE, index=False)
 
-            # Update the session with the new data
+            # Update session data
             session["user"] = {
-                "name": request.form.get("name"),
-                "gender": request.form.get("gender"),
-                "dob": request.form.get("dob"),
-                "role": request.form.get("role"),
-                "phone": request.form.get("phone"),
-                "emergencyContact": request.form.get("emergencyContact"),
-                "email": email
+                "Name": request.form.get("name"),
+                "Gender": request.form.get("gender"),
+                "Date of Birth": request.form.get("dob"),
+                "Role": request.form.get("role"),
+                "Mobile Number": request.form.get("phone"),
+                "Emergency Contact": request.form.get("emergencyContact"),
+                "Official Email": email,
+                "Vehicles": vehicles,
             }
 
-            return redirect("/profile")
+            # Flash success message
+            flash("Your profile has been successfully updated!", "success")
+            return redirect("/profile")  # Redirect after saving changes
 
-        except PermissionError:
-            error_message = "File is open or permission denied. Please close the file and try again."
-            return render_template("profile.html", user=session["user"], error=error_message)
-
-        except Exception as e:
-            error_message = f"An error occurred: {e}"
-            return render_template("profile.html", user=session["user"], error=error_message)
-
-    # GET request: Fetch user details from the Excel file
-    try:
-        df = pd.read_excel(EXCEL_FILE)
-        email = session["user"]["email"]
+        # For GET requests: Retrieve user details
         user = df[df["Official Email"] == email].to_dict(orient="records")[0]
+
+        # Parse vehicles from JSON string
+        if "Vehicles" in user and isinstance(user["Vehicles"], str):
+            user["Vehicles"] = eval(user["Vehicles"])  # Convert JSON string to list
 
         return render_template("profile.html", user=user)
 
+    except KeyError:
+        # Handle missing session email
+        return redirect("/")
     except FileNotFoundError:
-        return render_template("profile.html", error="Data file not found. Please try again later.")
+        flash("Data file not found. Please try again later.", "error")
+        return render_template("profile.html")
     except Exception as e:
-        return render_template("profile.html", error=f"An error occurred: {e}")
+        flash(f"An error occurred: {e}", "error")
+        return render_template("profile.html")
+
+
+@app.route("/validate_admin", methods=["POST"])
+def validate_admin():
+    data = request.get_json()
+    if data["password"] == ADMIN_PASSWORD:
+        return jsonify({"success": True})
+    return jsonify({"success": False})
+
+
+@app.route("/admin_dashboard", methods=["GET", "POST"])
+def admin_dashboard():
+    if "user" not in session:
+        return redirect("/")  # Redirect to login if user is not logged in
+
+    if request.method == "POST":
+        # Handle profile deletion
+        selected_emails = request.form.getlist("selected_profiles")  # Get selected profiles from the form
+        if selected_emails:
+            try:
+                # Load the Excel file
+                df = pd.read_excel(EXCEL_FILE)
+
+                # Remove rows with the selected emails
+                df = df[~df["Official Email"].isin(selected_emails)]
+
+                # Save the updated data back to the Excel file
+                df.to_excel(EXCEL_FILE, index=False)
+
+                flash("Selected profiles have been deleted successfully!", "success")
+            except Exception as e:
+                flash(f"An error occurred: {e}", "danger")
+        else:
+            flash("No profiles selected for deletion.", "warning")
+
+    # Load data from Excel to display in the dashboard
+    try:
+        df = pd.read_excel(EXCEL_FILE)
+        users_data = df.to_dict(orient="records")
+
+        # Convert vehicle strings back to dictionaries (if applicable)
+        for user in users_data:
+            if isinstance(user.get("Vehicles"), str):
+                try:
+                    user["vehicles"] = eval(user["Vehicles"])  # Convert JSON string to list
+                except Exception:
+                    user["vehicles"] = None
+            else:
+                user["vehicles"] = None
+
+        return render_template("admin_dashboard.html", users=users_data)
+    except Exception as e:
+        return f"Error loading admin data: {e}"
+
 
 # Route for finding a ride
 @app.route("/find_ride", methods=["GET", "POST"])
@@ -183,13 +282,50 @@ def find_ride():
 
 @app.route("/post_ride", methods=["GET", "POST"])
 def post_ride():
-    if request.method == "POST":
-        source = request.form.get("source")
-        destination = request.form.get("destination")
-        # Add logic to store ride in the database
-        return jsonify({"message": "Ride posted successfully!"})
-    return render_template("post_ride.html")
+    if request.method == 'POST':
+        # Retrieve form data
+        df = pd.read_excel(EXCEL_FILE)
+        vehicle_type = request.form.get('vehicle_type')
+        start_location = request.form.get('start_location')
+        destination = request.form.get('destination')
+        via_routes = request.form.getlist('via_routes')
+        preferred_start_time = f"{request.form.get('hour')}:{request.form.get('minute')}"
+        seats_available = request.form.get('seats_available')
+        ride_provider = session["user"]["name"]
 
+        # Create a ride entry
+        ride = {
+            'vehicle_type': vehicle_type,
+            'start_location': start_location,
+            'destination': destination,
+            'via_routes': [route for route in via_routes if route.strip()],
+            'preferred_start_time': preferred_start_time,
+            'seats_available': seats_available,
+            'ride_provider': ride_provider
+        }
+
+        # Save the ride in the mock database
+        rides.append(ride)
+        try:
+            # Check if the Excel file exists
+            try:
+                main_pd = pd.read_excel(ride_excel)
+            except FileNotFoundError:
+                main_pd = pd.DataFrame()  # Create an empty DataFrame if file doesn't exist
+
+            # Convert current ride to DataFrame and append it
+            new_ride = pd.DataFrame([ride])  # Convert the single ride dict to DataFrame
+            main_pd = pd.concat([main_pd, new_ride], ignore_index=True)
+
+            # Save updated data to Excel
+            main_pd.to_excel(ride_excel, index=False)
+
+        except Exception as e:
+            return f"An error occurred while saving ride details: {str(e)}"
+
+        return redirect(url_for('main_page'))
+
+    return render_template('post_ride.html')
 
 
 if __name__ == "__main__":
