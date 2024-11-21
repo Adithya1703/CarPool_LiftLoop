@@ -138,7 +138,15 @@
     <!-- Main Content -->
     <div class="container">
         <h2>Welcome to Zodiac LiftLoop</h2>
-        <p>No Ride History Available</p>
+    </div>
+
+    <div class="notifications">
+        <h3>Notifications</h3>
+        {% if notifications %}
+            <p>{{ notifications }}</p>
+        {% else %}
+            <p>No new notifications.</p>
+        {% endif %}
     </div>
 
     <!-- Ride Dashboard -->

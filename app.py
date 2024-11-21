@@ -24,44 +24,60 @@ def main_page():
     logged_in_user = session["user"]["name"]
 
     try:
+        # Load ride data
         main_pd = pd.read_excel(ride_excel)
 
-        # Ensure `via_routes` is correctly parsed as a list
+        # Parse `via_routes` into a valid list
         def parse_via_routes(value):
             if pd.isna(value):
-                return []  # Return empty list if the value is NaN
+                return []  # Return empty list for NaN
             if isinstance(value, str):
                 try:
-                    # Attempt to parse as JSON
-                    return json.loads(value)
-                except json.JSONDecodeError:
-                    # If JSON decoding fails, return as a single-item list
-                    return [value.strip()]
-            return value  # Return as is for already valid lists
+                    # Attempt to parse as JSON or eval if not a proper list
+                    return eval(value) if value.startswith("[") else [value.strip()]
+                except Exception:
+                    return [value.strip()]  # Fallback to a single-item list
+            return value  # Return as-is for already valid lists
 
         main_pd["via_routes"] = main_pd["via_routes"].apply(parse_via_routes)
 
         # Add logic to format time with AM/PM
         def format_time_with_ampm(time_str):
             try:
-                # Parse the time string in HH:mm format
                 hour, minute = map(int, time_str.split(":"))
                 am_pm = "AM" if hour < 12 else "PM"
                 hour = hour % 12 if hour != 12 else 12  # Convert to 12-hour format
                 return f"{hour}:{minute:02d} {am_pm}"
             except ValueError:
-                return time_str  # Return as is if parsing fails
+                return time_str  # Return as-is if parsing fails
 
-        # Apply formatting to the `preferred_start_time` column
         main_pd["preferred_start_time"] = main_pd["preferred_start_time"].apply(format_time_with_ampm)
 
         # Filter rides for the logged-in user
         user_rides = main_pd[main_pd["ride_provider"] == logged_in_user].to_dict(orient="records")
 
+        # Load user data for notifications
+        user_df = pd.read_excel(EXCEL_FILE)
+
+        # Ensure the `Notifications` column exists
+        if "Notifications" not in user_df.columns:
+            user_df["Notifications"] = ""
+
+        # Get notifications for the logged-in user
+        notifications = user_df[user_df["Name"] == logged_in_user]["Notifications"].values
+        notifications = notifications[0] if len(notifications) > 0 and pd.notna(notifications[0]) else ""
+
     except FileNotFoundError:
         user_rides = []
+        notifications = ""
 
-    return render_template("main.html", user=session["user"], rides=user_rides)
+    except Exception as e:
+        # Handle unexpected errors
+        flash(f"An error occurred: {str(e)}", "danger")
+        user_rides = []
+        notifications = ""
+
+    return render_template("main.html", user=session["user"], rides=user_rides, notifications=notifications)
 
 @app.route("/login", methods=["POST"])
 def login():
@@ -335,6 +351,11 @@ def find_ride():
     try:
         # Load ride data from Excel
         ride_df = pd.read_excel(ride_excel)
+        user_df = pd.read_excel(EXCEL_FILE)
+
+        # Add `Notifications` column if it doesn't exist
+        if "Notifications" not in user_df.columns:
+            user_df["Notifications"] = ""
 
         # Parse the "via_routes" column into a list
         def parse_via_routes(value):
@@ -347,9 +368,17 @@ def find_ride():
 
         ride_df["via_routes"] = ride_df["via_routes"].apply(parse_via_routes)
 
-        # Rename `preferred_start_time` to `start_time` to match frontend reference
-        if "preferred_start_time" in ride_df.columns:
-            ride_df.rename(columns={"preferred_start_time": "start_time"}, inplace=True)
+        # Parse and format time with AM/PM
+        def format_time_with_ampm(time_str):
+            try:
+                hour, minute = map(int, time_str.split(":"))
+                am_pm = "AM" if hour < 12 else "PM"
+                hour = hour % 12 if hour != 12 else 12
+                return f"{hour}:{minute:02d} {am_pm}"
+            except ValueError:
+                return time_str
+
+        ride_df["preferred_start_time"] = ride_df["preferred_start_time"].apply(format_time_with_ampm)
 
         if query:
             # Filter rides based on query
@@ -367,12 +396,35 @@ def find_ride():
     # Handle ride requests
     if request.method == "POST":
         if selected_rides:
-            flash(f"You have requested the following rides: {', '.join(selected_rides)}", "success")
+            try:
+                for ride in selected_rides:
+                    # Find the ride in ride_df
+                    ride_details = ride_df[ride_df["start_location"] + " to " + ride_df["destination"] == ride].iloc[0]
+                    ride_provider = ride_details["ride_provider"]
+
+                    # Match ride provider in user_df
+                    user_index = user_df[user_df["Name"] == ride_provider].index
+                    if not user_index.empty:
+                        user_index = user_index[0]
+
+                        # Add a notification
+                        existing_notifications = user_df.at[user_index, "Notifications"]
+                        new_notification = f"Ride request from {session['user']['name']} ({session['user']['email']}) for ride: {ride}"
+                        if pd.isna(existing_notifications) or existing_notifications == "":
+                            user_df.at[user_index, "Notifications"] = new_notification
+                        else:
+                            user_df.at[user_index, "Notifications"] += f"; {new_notification}"
+
+                # Save updated user data back to Excel
+                user_df.to_excel(EXCEL_FILE, index=False)
+                flash("Ride request sent successfully!", "success")
+
+            except Exception as e:
+                flash(f"An error occurred while sending the request: {e}", "danger")
         else:
             flash("No rides selected!", "warning")
 
     return render_template("find_ride.html", rides=rides_data)
-
 
 
 @app.route("/post_ride", methods=["GET", "POST"])
