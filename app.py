@@ -16,6 +16,7 @@ rides =[]
 def home():
     return render_template("login.html")
 
+#router to main page
 @app.route('/main_page')
 def main_page():
     if "user" not in session:
@@ -33,7 +34,6 @@ def main_page():
                 return []  # Return empty list for NaN
             if isinstance(value, str):
                 try:
-                    # Attempt to parse as JSON or eval if not a proper list
                     return eval(value) if value.startswith("[") else [value.strip()]
                 except Exception:
                     return [value.strip()]  # Fallback to a single-item list
@@ -65,19 +65,23 @@ def main_page():
 
         # Get notifications for the logged-in user
         notifications = user_df[user_df["Name"] == logged_in_user]["Notifications"].values
-        notifications = notifications[0] if len(notifications) > 0 and pd.notna(notifications[0]) else ""
+        if len(notifications) > 0 and pd.notna(notifications[0]):
+            notifications = eval(notifications[0]) if isinstance(notifications[0], str) else notifications[0]
+        else:
+            notifications = []
 
     except FileNotFoundError:
         user_rides = []
-        notifications = ""
+        notifications = []
 
     except Exception as e:
         # Handle unexpected errors
         flash(f"An error occurred: {str(e)}", "danger")
         user_rides = []
-        notifications = ""
+        notifications = []
 
     return render_template("main.html", user=session["user"], rides=user_rides, notifications=notifications)
+
 
 @app.route("/login", methods=["POST"])
 def login():
@@ -176,9 +180,8 @@ def signup():
 
 @app.route("/profile", methods=["GET", "POST"])
 def profile():
-    # Ensure the user is logged in
     if "user" not in session:
-        return redirect("/")
+        return redirect("/")  # Redirect to login if the user is not logged in
 
     try:
         # Load the Excel file
@@ -223,16 +226,21 @@ def profile():
                 "Vehicles": vehicles,
             }
 
-            # Flash success message
             flash("Your profile has been successfully updated!", "success")
             return redirect("/profile")  # Redirect after saving changes
 
         # For GET requests: Retrieve user details
         user = df[df["Official Email"] == email].to_dict(orient="records")[0]
 
-        # Parse vehicles from JSON string
-        if "Vehicles" in user and isinstance(user["Vehicles"], str):
-            user["Vehicles"] = eval(user["Vehicles"])  # Convert JSON string to list
+        # Parse vehicles from JSON string or handle NaN
+        if "Vehicles" in user:
+            if isinstance(user["Vehicles"], str):  # If it's a string, convert to list
+                try:
+                    user["Vehicles"] = eval(user["Vehicles"])  # Convert JSON string to list
+                except Exception:
+                    user["Vehicles"] = []  # If parsing fails, set to empty list
+            elif pd.isna(user["Vehicles"]):  # If it's NaN, set to empty list
+                user["Vehicles"] = []
 
         return render_template("profile.html", user=user)
 
@@ -344,18 +352,14 @@ def find_ride():
     if "user" not in session:
         return redirect(url_for("login"))  # Redirect to login if not logged in
 
-    query = request.args.get("query")  # Get the search query
+    start_location = request.args.get("start_location")  # Get seeker’s start location
+    destination = request.args.get("destination")  # Get seeker’s destination
     selected_rides = request.form.getlist("selected_rides")  # Get selected rides for request
     rides_data = []
 
     try:
         # Load ride data from Excel
         ride_df = pd.read_excel(ride_excel)
-        user_df = pd.read_excel(EXCEL_FILE)
-
-        # Add `Notifications` column if it doesn't exist
-        if "Notifications" not in user_df.columns:
-            user_df["Notifications"] = ""
 
         # Parse the "via_routes" column into a list
         def parse_via_routes(value):
@@ -368,63 +372,75 @@ def find_ride():
 
         ride_df["via_routes"] = ride_df["via_routes"].apply(parse_via_routes)
 
-        # Parse and format time with AM/PM
-        def format_time_with_ampm(time_str):
-            try:
-                hour, minute = map(int, time_str.split(":"))
-                am_pm = "AM" if hour < 12 else "PM"
-                hour = hour % 12 if hour != 12 else 12
-                return f"{hour}:{minute:02d} {am_pm}"
-            except ValueError:
-                return time_str
-
-        ride_df["preferred_start_time"] = ride_df["preferred_start_time"].apply(format_time_with_ampm)
-
-        if query:
-            # Filter rides based on query
+        if start_location and destination:
+            # Filter rides based on start location, destination, or via routes
             rides_data = ride_df[
-                (ride_df["start_location"].str.contains(query, case=False, na=False)) |
-                (ride_df["destination"].str.contains(query, case=False, na=False)) |
-                (ride_df["via_routes"].apply(lambda routes: any(query.lower() in route.lower() for route in routes)))
+                (ride_df["start_location"].str.contains(start_location, case=False, na=False)) |
+                (ride_df["destination"].str.contains(destination, case=False, na=False)) |
+                (ride_df["via_routes"].apply(
+                    lambda routes: any(start_location.lower() in route.lower() or destination.lower() in route.lower() for route in routes)
+                ))
             ].to_dict(orient="records")
         else:
-            # If no query, show all rides
+            # If no start location or destination provided, show all rides
             rides_data = ride_df.to_dict(orient="records")
+
+        # Handle ride requests
+        if request.method == "POST":
+            if selected_rides:
+                # Load user data to fetch seeker information
+                user_df = pd.read_excel(EXCEL_FILE)
+
+                # Ensure the `Notifications` column exists
+                if "Notifications" not in user_df.columns:
+                    user_df["Notifications"] = ""  # Add the column with default empty strings
+
+                seeker_name = session["user"]["name"]
+                seeker_email = session["user"]["email"]
+                seeker_phone = session["user"]["phone"]
+
+                for ride in selected_rides:
+                    # Split ride into `start_location` and `destination`
+                    ride_parts = ride.split(" to ")
+                    if len(ride_parts) == 2:
+                        selected_start, selected_destination = ride_parts
+
+                        # Find the ride in the DataFrame
+                        ride_info = ride_df[
+                            (ride_df["start_location"] == selected_start) &
+                            (ride_df["destination"] == selected_destination)
+                        ]
+
+                        if not ride_info.empty:
+                            ride_provider = ride_info.iloc[0]["ride_provider"]
+
+                            # Add or append the notification for the ride provider
+                            existing_notifications = user_df.loc[user_df["Name"] == ride_provider, "Notifications"].values
+                            if existing_notifications and pd.notna(existing_notifications[0]):
+                                notifications = eval(existing_notifications[0])  # Convert string to list
+                            else:
+                                notifications = []
+
+                            # Add new notification
+                            notifications.append(
+                                f"Ride request from {seeker_name} ({seeker_email}, {seeker_phone}) "
+                                f"for pickup at {selected_start} and drop at {selected_destination}."
+                            )
+
+                            # Save updated notifications as a JSON string
+                            user_df.loc[user_df["Name"] == ride_provider, "Notifications"] = str(notifications)
+
+                # Save the updated user DataFrame
+                user_df.to_excel(EXCEL_FILE, index=False)
+
+                flash("Your ride request has been sent!", "success")
+            else:
+                flash("No rides selected!", "warning")
+
     except FileNotFoundError:
         flash("Ride data not found!", "danger")
 
-    # Handle ride requests
-    if request.method == "POST":
-        if selected_rides:
-            try:
-                for ride in selected_rides:
-                    # Find the ride in ride_df
-                    ride_details = ride_df[ride_df["start_location"] + " to " + ride_df["destination"] == ride].iloc[0]
-                    ride_provider = ride_details["ride_provider"]
-
-                    # Match ride provider in user_df
-                    user_index = user_df[user_df["Name"] == ride_provider].index
-                    if not user_index.empty:
-                        user_index = user_index[0]
-
-                        # Add a notification
-                        existing_notifications = user_df.at[user_index, "Notifications"]
-                        new_notification = f"Ride request from {session['user']['name']} ({session['user']['email']}) for ride: {ride}"
-                        if pd.isna(existing_notifications) or existing_notifications == "":
-                            user_df.at[user_index, "Notifications"] = new_notification
-                        else:
-                            user_df.at[user_index, "Notifications"] += f"; {new_notification}"
-
-                # Save updated user data back to Excel
-                user_df.to_excel(EXCEL_FILE, index=False)
-                flash("Ride request sent successfully!", "success")
-
-            except Exception as e:
-                flash(f"An error occurred while sending the request: {e}", "danger")
-        else:
-            flash("No rides selected!", "warning")
-
-    return render_template("find_ride.html", rides=rides_data)
+    return render_template("find_ride.html", rides=rides_data, start_location=start_location, destination=destination)
 
 
 @app.route("/post_ride", methods=["GET", "POST"])

@@ -128,47 +128,52 @@
 
         <!-- Search Form -->
         <form class="search-form" method="GET" action="/find_ride">
-            <input type="text" name="query" placeholder="Search Rides" value="{{ request.args.get('query', '') }}">
+            <input type="text" name="start_location" placeholder="Your Start Location" value="{{ request.args.get('start_location', '') }}">
+            <input type="text" name="destination" placeholder="Your Destination" value="{{ request.args.get('destination', '') }}">
             <button type="submit">Search</button>
         </form>
 
-        <!-- Rides Table -->
-        <form method="POST" action="/find_ride">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Select</th>
-                        <th>Vehicle Type</th>
-                        <th>Start Location</th>
-                        <th>Destination</th>
-                        <th>Via Routes</th>
-                        <th>Start Time</th>
-                        <th>Seats</th>
-                        <th>Provider</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for ride in rides %}
-                    <tr>
-                        <td><input type="checkbox" name="selected_rides" value="{{ ride['start_location'] }} to {{ ride['destination'] }}"></td>
-                        <td>{{ ride["vehicle_type"] }}</td>
-                        <td>{{ ride["start_location"] }}</td>
-                        <td>{{ ride["destination"] }}</td>
-                        <td>{{ ride["via_routes"] | join(', ') }}</td>
-                        <td>{{ ride["preferred_start_time"] }}</td>
-                        <td>{{ ride["seats_available"] }}</td>
-                        <td>{{ ride["ride_provider"] }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+<!-- Rides Table -->
+<form method="POST" action="/find_ride">
+    <!-- Hidden fields to retain start and destination -->
+    <input type="hidden" name="start_location" value="{{ request.args.get('start_location', '') }}">
+    <input type="hidden" name="destination" value="{{ request.args.get('destination', '') }}">
 
-            <!-- Buttons -->
-            <div class="button-wrapper">
-                <button type="button" class="btn-back" onclick="window.location.href='/main_page';">Back</button>
-                <button type="submit" class="btn-request">Request</button>
-            </div>
-        </form>
+    <table>
+        <thead>
+            <tr>
+                <th>Select</th>
+                <th>Vehicle Type</th>
+                <th>Start Location</th>
+                <th>Destination</th>
+                <th>Via Routes</th>
+                <th>Start Time</th>
+                <th>Seats</th>
+                <th>Provider</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ride in rides %}
+            <tr>
+                <td><input type="checkbox" name="selected_rides" value="{{ ride['start_location'] }} to {{ ride['destination'] }}"></td>
+                <td>{{ ride["vehicle_type"] }}</td>
+                <td>{{ ride["start_location"] }}</td>
+                <td>{{ ride["destination"] }}</td>
+                <td>{{ ride["via_routes"] | join(', ') }}</td>
+                <td>{{ ride["preferred_start_time"] }}</td>
+                <td>{{ ride["seats_available"] }}</td>
+                <td>{{ ride["ride_provider"] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Buttons -->
+    <div class="button-wrapper">
+        <button type="button" class="btn-back" onclick="window.location.href='/main_page';">Back</button>
+        <button type="submit" class="btn-request">Request</button>
+    </div>
+</form>
     </div>
 </body>
 </html>

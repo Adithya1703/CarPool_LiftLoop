@@ -123,30 +123,37 @@
             <label for="email">Official Email</label>
             <input type="email" id="email" name="email" value="{{ user['Official Email'] }}" readonly>
 
-            <h3>Vehicles</h3>
-            <table id="vehicleTable">
-                <thead>
-                    <tr>
-                        <th>Vehicle Name</th>
-                        <th>Vehicle Type</th>
-                        <th>Number Plate</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for vehicle in user['Vehicles'] %}
-                    <tr>
-                        <td><input type="text" name="vehicleName[]" value="{{ vehicle['name'] }}" readonly></td>
-                        <td>
-                            <select name="vehicleType[]" disabled>
-                                <option value="Two Wheeler" {{ "selected" if vehicle["type"] == "Two Wheeler" else "" }}>Two Wheeler</option>
-                                <option value="Four Wheeler" {{ "selected" if vehicle["type"] == "Four Wheeler" else "" }}>Four Wheeler</option>
-                            </select>
-                        </td>
-                        <td><input type="text" name="numberPlate[]" value="{{ vehicle['numberPlate'] }}" readonly></td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+<h3>Vehicles</h3>
+<table id="vehicleTable">
+    <thead>
+        <tr>
+            <th>Vehicle Name</th>
+            <th>Vehicle Type</th>
+            <th>Number Plate</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% if user['Vehicles'] %}
+            {% for vehicle in user['Vehicles'] %}
+            <tr>
+                <td><input type="text" name="vehicleName[]" value="{{ vehicle['name'] }}" readonly></td>
+                <td>
+                    <select name="vehicleType[]" disabled>
+                        <option value="Two Wheeler" {{ "selected" if vehicle["type"] == "Two Wheeler" else "" }}>Two Wheeler</option>
+                        <option value="Four Wheeler" {{ "selected" if vehicle["type"] == "Four Wheeler" else "" }}>Four Wheeler</option>
+                    </select>
+                </td>
+                <td><input type="text" name="numberPlate[]" value="{{ vehicle['numberPlate'] }}" readonly></td>
+            </tr>
+            {% endfor %}
+        {% else %}
+            <tr>
+                <td colspan="3">No vehicles registered.</td>
+            </tr>
+        {% endif %}
+    </tbody>
+</table>
+
 
             <div class="buttons">
                 <button type="button" class="btn btn-back" onclick="goBack()">Back</button>
