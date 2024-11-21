@@ -12,6 +12,12 @@ app.secret_key = "0123456789"
 def home():
     return render_template("login.html")
 
+@app.route('/main_page')
+def main_page():
+    if "user" not in session:
+        return redirect(url_for("login"))  # Redirect to login if not logged in
+    return render_template("main.html", user=session["user"])
+
 @app.route("/login", methods=["POST"])
 def login():
     # Get ZF email ID and password from form
@@ -53,6 +59,14 @@ def login():
     except Exception as e:
         return render_template("login.html", error=f"An error occurred: {str(e)}")  # Re-render login page with error
 
+@app.route("/logout")
+def logout():
+    # Clear the user session
+    session.clear()
+    # Redirect to the login page
+    return redirect(url_for("home"))
+
+
 @app.route('/signup', methods=['GET'])
 def signup_page():
     return render_template('signup.html')
@@ -81,7 +95,8 @@ def signup():
         "Mobile Number": data["mobileNumber"],
         "Emergency Contact": data["emergencyContact"],
         "Official Email": data["officialEmail"],
-        "Hashed Password": hashed_password.decode('utf-8')  # Store as a readable string
+        "Hashed Password": hashed_password.decode('utf-8'), # Store as a readable string
+        "Vehicles": data.get("vehicles", [])  # Defaults to an empty list if no vehicles are provided
     }
 
     # Save to Excel
@@ -98,25 +113,64 @@ def signup():
     return jsonify({"message": "Signup successful and data saved to Excel!"}), 200
 
 
-@app.route("/app/main")
-def main_page():
-    # Ensure the user is logged in
-    if "user" not in session:
-        return redirect(url_for("home"))
-
-    # Pass the logged-in user data to the main.html template
-    return render_template("main.html", user=session["user"])
-
-
-@app.route("/profile")
+@app.route("/profile", methods=["GET", "POST"])
 def profile():
-    # Ensure the user is logged in
     if "user" not in session:
-        return jsonify({"message": "User not logged in."}), 401
+        return redirect("/")
 
-    # Return the logged-in user's data as JSON
-    return jsonify(session["user"])
+    if request.method == "POST":
+        try:
+            # Load the Excel file
+            df = pd.read_excel(EXCEL_FILE)
 
+            # Find the user's row based on email
+            email = session["user"]["email"]
+            user_index = df[df["Official Email"] == email].index[0]
+
+            # Update the user's details
+            df.at[user_index, "Name"] = request.form.get("name")
+            df.at[user_index, "Gender"] = request.form.get("gender")
+            df.at[user_index, "Date of Birth"] = request.form.get("dob")
+            df.at[user_index, "Role"] = request.form.get("role")
+            df.at[user_index, "Mobile Number"] = request.form.get("phone")
+            df.at[user_index, "Emergency Contact"] = request.form.get("emergencyContact")
+
+            # Save the updated data to the Excel file
+            df.to_excel(EXCEL_FILE, index=False)
+
+            # Update the session with the new data
+            session["user"] = {
+                "name": request.form.get("name"),
+                "gender": request.form.get("gender"),
+                "dob": request.form.get("dob"),
+                "role": request.form.get("role"),
+                "phone": request.form.get("phone"),
+                "emergencyContact": request.form.get("emergencyContact"),
+                "email": email
+            }
+
+            return redirect("/profile")
+
+        except PermissionError:
+            error_message = "File is open or permission denied. Please close the file and try again."
+            return render_template("profile.html", user=session["user"], error=error_message)
+
+        except Exception as e:
+            error_message = f"An error occurred: {e}"
+            return render_template("profile.html", user=session["user"], error=error_message)
+
+    # GET request: Fetch user details from the Excel file
+    try:
+        df = pd.read_excel(EXCEL_FILE)
+        email = session["user"]["email"]
+        user = df[df["Official Email"] == email].to_dict(orient="records")[0]
+
+        return render_template("profile.html", user=user)
+
+    except FileNotFoundError:
+        return render_template("profile.html", error="Data file not found. Please try again later.")
+    except Exception as e:
+        return render_template("profile.html", error=f"An error occurred: {e}")
 
 # Route for finding a ride
 @app.route("/find_ride", methods=["GET", "POST"])
@@ -135,6 +189,8 @@ def post_ride():
         # Add logic to store ride in the database
         return jsonify({"message": "Ride posted successfully!"})
     return render_template("post_ride.html")
+
+
 
 if __name__ == "__main__":
     app.run(debug=True)

@@ -89,6 +89,35 @@
             <input type="email" id="officialEmail" name="officialEmail" class="form-control" required>
         </div>
 
+        <div id="vehicleSection">
+    <h5>Vehicles (Optional)</h5>
+    <div class="vehicle-entry">
+        <div class="mb-3">
+            <label for="vehicleName" class="form-label">Vehicle Name</label>
+            <input type="text" class="form-control" name="vehicleName[]" placeholder="e.g., Honda City">
+        </div>
+        <div class="mb-3">
+            <label for="vehicleType" class="form-label">Vehicle Type</label>
+            <select class="form-select" name="vehicleType[]">
+                <option value="" disabled selected>Select Vehicle Type</option>
+                <option value="Two Wheeler">Two Wheeler</option>
+                <option value="Four Wheeler">Four Wheeler</option>
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="numberPlate" class="form-label">Number Plate ID</label>
+            <input type="text" class="form-control" name="numberPlate[]" placeholder="e.g., ABC1234">
+        </div>
+    </div>
+</div>
+<button type="button" class="btn btn-secondary mb-3" id="addVehicleButton">Add Another Vehicle</button>
+
+<!-- Vehicle List -->
+<div id="vehicleList" class="mt-3">
+    <h6>Vehicles Added:</h6>
+    <ul id="vehicleDisplay"></ul>
+</div>
+
         <div class="mb-3 mt-3 form-check">
             <input type="checkbox" id="terms" name="terms" class="form-check-input" required>
             <label for="terms" class="form-check-label">I hereby agree to <a href="#">Terms and Conditions</a></label>
@@ -98,28 +127,109 @@
     </form>
 
     <script>
-        document.getElementById("signupForm").addEventListener("submit", async (event) => {
-            event.preventDefault();
+    document.getElementById("signupForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
 
-            const formData = new FormData(event.target);
-            const data = Object.fromEntries(formData.entries());
+        // Collect form data
+        const formData = new FormData(event.target);
+        const data = Object.fromEntries(formData.entries());
 
-            if (data.password !== data.confirmPassword) {
-                alert("Passwords do not match!");
-                return;
-            }
+        // Validate passwords
+        if (data.password !== data.confirmPassword) {
+            alert("Passwords do not match!");
+            return;
+        }
 
-            const response = await fetch("/signup", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(data),
-            });
+        // Collect vehicle details
+        const vehicleNames = formData.getAll("vehicleName[]");
+        const vehicleTypes = formData.getAll("vehicleType[]");
+        const numberPlates = formData.getAll("numberPlate[]");
+        const vehicles = vehicleNames.map((name, index) => ({
+            name: name.trim(), // Vehicle name
+            type: vehicleTypes[index].trim(), // Vehicle type
+            numberPlate: numberPlates[index].trim(), // Number plate ID
+        })).filter(vehicle => vehicle.name || vehicle.type || vehicle.numberPlate); // Exclude empty vehicles
 
-            const result = await response.json();
-            if (result.message) {
-                alert(result.message);
-            }
+        // Attach vehicles to the data object
+        data.vehicles = vehicles;
+
+        // Send the data to the server
+        const response = await fetch("/signup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
         });
-    </script>
+
+        // Handle the server response
+        const result = await response.json();
+        if (result.message) {
+            alert(result.message);
+        }
+    });
+
+    // Dynamically add vehicles and update the display list
+    document.getElementById("addVehicleButton").addEventListener("click", () => {
+        const vehicleSection = document.getElementById("vehicleSection");
+        const newVehicle = document.createElement("div");
+        newVehicle.classList.add("vehicle-entry");
+        newVehicle.innerHTML = `
+            <div class="mb-3">
+                <label for="vehicleName" class="form-label">Vehicle Name</label>
+                <input type="text" class="form-control" name="vehicleName[]" placeholder="e.g., Honda City">
+            </div>
+            <div class="mb-3">
+                <label for="vehicleType" class="form-label">Vehicle Type</label>
+                <select class="form-select" name="vehicleType[]">
+                    <option value="" disabled selected>Select Vehicle Type</option>
+                    <option value="Two Wheeler">Two Wheeler</option>
+                    <option value="Four Wheeler">Four Wheeler</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label for="numberPlate" class="form-label">Number Plate ID</label>
+                <input type="text" class="form-control" name="numberPlate[]" placeholder="e.g., ABC1234">
+            </div>
+        `;
+        vehicleSection.appendChild(newVehicle);
+
+        // Update the vehicle list display
+        updateVehicleList();
+    });
+
+    // Function to update the vehicle list display
+    function updateVehicleList() {
+        const vehicleNames = document.getElementsByName("vehicleName[]");
+        const vehicleTypes = document.getElementsByName("vehicleType[]");
+        const numberPlates = document.getElementsByName("numberPlate[]");
+        const vehicleDisplay = document.getElementById("vehicleDisplay");
+
+        // Clear the current list
+        vehicleDisplay.innerHTML = "";
+
+        // Populate the list with current vehicles
+        for (let i = 0; i < vehicleNames.length; i++) {
+            const name = vehicleNames[i].value.trim();
+            const type = vehicleTypes[i].value.trim();
+            const plate = numberPlates[i].value.trim();
+
+            if (name || type || plate) {
+                const listItem = document.createElement("li");
+                listItem.textContent = `${name || "Unknown Vehicle Name"} - ${type || "Unknown Type"} - ${plate || "No Plate ID"}`;
+                vehicleDisplay.appendChild(listItem);
+            }
+        }
+    }
+
+    // Automatically update the list as users input data
+    document.addEventListener("input", (event) => {
+        if (
+            event.target.name === "vehicleName[]" ||
+            event.target.name === "vehicleType[]" ||
+            event.target.name === "numberPlate[]"
+        ) {
+            updateVehicleList();
+        }
+    });
+</script>
 </body>
 </html>

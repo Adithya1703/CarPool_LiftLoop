@@ -4,8 +4,9 @@
     <title>Dashboard</title>
     <style>
         body { font-family: Arial, sans-serif; }
-        nav { background: teal; color: white; padding: 10px; }
-        nav a { color: white; margin: 10px; text-decoration: none; }
+        nav { background: teal; color: white; padding: 10px; display: flex; justify-content: space-between; align-items: center; }
+        nav a { color: white; margin-left: 15px; text-decoration: none; }
+        nav a:hover { text-decoration: underline; }
         .container { margin: 20px; }
 
         /* Floating button styles */
@@ -38,9 +39,18 @@
     </style>
 </head>
 <body>
+    <!-- Navigation Bar -->
     <nav>
-        <strong>{{ user.name }}</strong> | <a href="/profile">Profile</a> | <a href="/find_ride">Find a Ride</a> | <a href="/logout">Logout</a>
+        <div>
+            <strong>{{ user.name }}</strong>
+        </div>
+        <div>
+            <a href="/profile">Profile</a>
+            <a href="javascript:confirmLogout()" id="logout">Logout</a>
+        </div>
     </nav>
+
+    <!-- Main Content -->
     <div class="container">
         <h2>Welcome to Zodiac LiftLoop</h2>
         <p>No Ride History Available</p>
@@ -68,6 +78,11 @@
         }
         function addNew() {
             alert("Feature coming soon!"); // Placeholder for additional functionality
+        }
+        function confirmLogout() {
+            if (confirm("Are you sure you want to logout?")) {
+                window.location.href = "/logout";  // Proceed to logout
+            }
         }
     </script>
 </body>
