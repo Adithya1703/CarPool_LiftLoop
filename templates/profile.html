@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 50px auto;
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        h2 {
+            text-align: center;
+            color: #333;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            margin: 10px 0 5px;
+            color: #555;
+        }
+        input, select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            background: #f9f9f9;
+            pointer-events: none;
+        }
+        input.editable, select.editable {
+            background: white;
+            pointer-events: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        .btn {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: teal;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .btn:hover {
+            background-color: darkcyan;
+        }
+        .buttons {
+            display: flex;
+            justify-content: space-between;
+        }
+        .btn-save {
+            background-color: green;
+        }
+        .btn-save:hover {
+            background-color: darkgreen;
+        }
+        .btn-back {
+            background-color: gray;
+        }
+        .btn-back:hover {
+            background-color: darkgray;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Profile</h2>
+
+        <!-- Notification Section -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div>
+                    {% for category, message in messages %}
+                        <p class="alert alert-{{ category }}">{{ message }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form id="profileForm" method="POST" action="/profile">
+            <label for="name">Name</label>
+            <input type="text" id="name" name="name" value="{{ user['Name'] }}" readonly>
+
+            <label for="gender">Gender</label>
+            <input type="text" id="gender" name="gender" value="{{ user['Gender'] }}" readonly>
+
+            <label for="dob">Date of Birth</label>
+            <input type="text" id="dob" name="dob" value="{{ user['Date of Birth'] }}" readonly>
+
+            <label for="role">Role</label>
+            <input type="text" id="role" name="role" value="{{ user['Role'] }}" readonly>
+
+            <label for="phone">Mobile Number</label>
+            <input type="text" id="phone" name="phone" value="{{ user['Mobile Number'] }}" readonly>
+
+            <label for="emergencyContact">Emergency Contact</label>
+            <input type="text" id="emergencyContact" name="emergencyContact" value="{{ user['Emergency Contact'] }}" readonly>
+
+            <label for="email">Official Email</label>
+            <input type="email" id="email" name="email" value="{{ user['Official Email'] }}" readonly>
+
+            <h3>Vehicles</h3>
+            <table id="vehicleTable">
+                <thead>
+                    <tr>
+                        <th>Vehicle Name</th>
+                        <th>Vehicle Type</th>
+                        <th>Number Plate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vehicle in user['Vehicles'] %}
+                    <tr>
+                        <td><input type="text" name="vehicleName[]" value="{{ vehicle['name'] }}" readonly></td>
+                        <td>
+                            <select name="vehicleType[]" disabled>
+                                <option value="Two Wheeler" {{ "selected" if vehicle["type"] == "Two Wheeler" else "" }}>Two Wheeler</option>
+                                <option value="Four Wheeler" {{ "selected" if vehicle["type"] == "Four Wheeler" else "" }}>Four Wheeler</option>
+                            </select>
+                        </td>
+                        <td><input type="text" name="numberPlate[]" value="{{ vehicle['numberPlate'] }}" readonly></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <div class="buttons">
+                <button type="button" class="btn btn-back" onclick="goBack()">Back</button>
+                <button type="button" class="btn" id="editButton" onclick="enableEdit()">Edit</button>
+                <button type="submit" class="btn btn-save" id="saveButton" disabled>Save</button>
+            </div>
+        </form>
+        {% if error %}
+            <p class="error">{{ error }}</p>
+        {% endif %}
+    </div>
+
+    <script>
+        function enableEdit() {
+            // Enable all form fields
+            const fields = document.querySelectorAll("#profileForm input, #profileForm select");
+            fields.forEach(field => {
+                field.classList.add("editable");
+                field.readOnly = false;
+                field.disabled = false;
+            });
+
+            // Enable the Save button
+            document.getElementById("saveButton").disabled = false;
+            document.getElementById("editButton").disabled = true;
+        }
+        function goBack() {
+            // Redirect to the main page
+            window.location.href = "/main_page";
+        }
+    </script>
+</body>
+</html>
