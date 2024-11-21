@@ -232,8 +232,11 @@ def admin_dashboard():
         return redirect("/")  # Redirect to login if user is not logged in
 
     if request.method == "POST":
-        # Handle profile deletion
-        selected_emails = request.form.getlist("selected_profiles")  # Get selected profiles from the form
+        # Handle profile and ride deletion
+        selected_emails = request.form.getlist("selected_profiles")  # Selected profiles for deletion
+        selected_rides = request.form.getlist("selected_rides")  # Selected rides for deletion
+
+        # Delete profiles
         if selected_emails:
             try:
                 # Load the Excel file
@@ -247,14 +250,28 @@ def admin_dashboard():
 
                 flash("Selected profiles have been deleted successfully!", "success")
             except Exception as e:
-                flash(f"An error occurred: {e}", "danger")
-        else:
-            flash("No profiles selected for deletion.", "warning")
+                flash(f"An error occurred while deleting profiles: {e}", "danger")
 
-    # Load data from Excel to display in the dashboard
+        # Delete rides
+        if selected_rides:
+            try:
+                # Load the ride Excel file
+                ride_df = pd.read_excel(ride_excel)
+
+                # Remove rows with the selected rides (use a unique identifier if available)
+                ride_df = ride_df[~ride_df.index.isin(map(int, selected_rides))]
+
+                # Save the updated data back to the ride Excel file
+                ride_df.to_excel(ride_excel, index=False)
+
+                flash("Selected rides have been deleted successfully!", "success")
+            except Exception as e:
+                flash(f"An error occurred while deleting rides: {e}", "danger")
+
+    # Load profile data
     try:
-        df = pd.read_excel(EXCEL_FILE)
-        users_data = df.to_dict(orient="records")
+        profile_df = pd.read_excel(EXCEL_FILE)
+        users_data = profile_df.to_dict(orient="records")
 
         # Convert vehicle strings back to dictionaries (if applicable)
         for user in users_data:
@@ -265,10 +282,19 @@ def admin_dashboard():
                     user["vehicles"] = None
             else:
                 user["vehicles"] = None
-
-        return render_template("admin_dashboard.html", users=users_data)
     except Exception as e:
-        return f"Error loading admin data: {e}"
+        users_data = []
+        flash(f"Error loading profiles: {e}", "danger")
+
+    # Load ride data
+    try:
+        ride_df = pd.read_excel(ride_excel)
+        rides_data = ride_df.to_dict(orient="records")
+    except Exception as e:
+        rides_data = []
+        flash(f"Error loading rides: {e}", "danger")
+
+    return render_template("admin_dashboard.html", users=users_data, rides=rides_data)
 
 
 # Route for finding a ride
@@ -324,6 +350,7 @@ def post_ride():
             return f"An error occurred while saving ride details: {str(e)}"
 
         return redirect(url_for('main_page'))
+        return redirect(url_for('admin_dashboard'))
 
     return render_template('post_ride.html')
 

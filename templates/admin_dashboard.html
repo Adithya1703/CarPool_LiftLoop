@@ -25,12 +25,6 @@
             color: teal;
             margin-bottom: 10px;
         }
-        p {
-            text-align: center;
-            font-size: 16px;
-            color: #555;
-            margin-bottom: 30px;
-        }
         table {
             width: 100%;
             border-collapse: collapse;
@@ -45,12 +39,6 @@
         table th {
             background-color: teal;
             color: white;
-            text-transform: uppercase;
-            font-weight: bold;
-            font-size: 14px;
-        }
-        table tbody tr:hover {
-            background-color: #f9f9f9;
         }
         .btn-container {
             display: flex;
@@ -63,7 +51,6 @@
             border-radius: 4px;
             font-size: 16px;
             cursor: pointer;
-            transition: background-color 0.3s ease;
         }
         .btn-delete {
             background-color: #ff4d4d;
@@ -79,21 +66,15 @@
         .btn-back:hover {
             background-color: darkcyan;
         }
-        ul {
-            list-style-type: none;
-            padding: 0;
-            margin: 0;
-        }
-        ul li {
-            margin: 5px 0;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <h2>Admin Dashboard</h2>
-        <p>Welcome to the admin dashboard! You have access to adding or removing profiles.</p>
+        <p>Welcome to the admin dashboard! You have access to adding or removing profiles and rides.</p>
 
+        <!-- Profiles Table -->
+        <h3>Profiles</h3>
         <form id="deleteForm" method="POST" action="/admin_dashboard">
             <table>
                 <thead>
@@ -129,6 +110,38 @@
                     {% endfor %}
                 </tbody>
             </table>
+
+            <!-- Rides Table -->
+            <h3>Rides</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Select</th>
+                        <th>Vehicle Type</th>
+                        <th>Start Location</th>
+                        <th>Destination</th>
+                        <th>Via Routes</th>
+                        <th>Start Time</th>
+                        <th>Seats</th>
+                        <th>Provider</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ride in rides %}
+                    <tr>
+                        <td><input type="checkbox" name="selected_rides" value="{{ loop.index0 }}"></td>
+                        <td>{{ ride['vehicle_type'] }}</td>
+                        <td>{{ ride['start_location'] }}</td>
+                        <td>{{ ride['destination'] }}</td>
+                        <td>{{ ride['via_routes'] | join(', ') }}</td>
+                        <td>{{ ride['preferred_start_time'] }}</td>
+                        <td>{{ ride['seats_available'] }}</td>
+                        <td>{{ ride['ride_provider'] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
             <div class="btn-container">
                 <button type="submit" class="btn btn-delete">Delete Selected</button>
                 <button type="button" class="btn btn-back" onclick="goBack()">Back</button>
