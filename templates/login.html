@@ -23,6 +23,10 @@
             box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
             text-align: center;
         }
+        .form-container img {
+            width: 120px; /* Adjust size as needed */
+            margin-bottom: 15px;
+        }
         .form-container h2 {
             margin-bottom: 20px;
             font-size: 24px;
@@ -71,6 +75,8 @@
 </head>
 <body>
     <div class="form-container">
+         <!-- Logo at the top -->
+        <img src="/static/images/liftloop_logo.png" alt="LiftLoop Logo">
         <h2>Login</h2>
         <form method="POST" action="/login">
             <!-- ZF Email ID Input -->
