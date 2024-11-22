@@ -148,6 +148,12 @@
             const formData = new FormData(event.target);
             const data = Object.fromEntries(formData.entries());
 
+            // Validate ZF email domain
+            if (!data.officialEmail.includes("zf")) {
+                alert("Please use a valid ZF email address.");
+                return;
+            }
+
             if (data.password !== data.confirmPassword) {
                 document.getElementById("confirmPasswordError").style.display = "block";
                 return;

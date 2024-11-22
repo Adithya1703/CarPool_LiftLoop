@@ -16,7 +16,6 @@ rides =[]
 def home():
     return render_template("login.html")
 
-#router to main page
 @app.route('/main_page')
 def main_page():
     if "user" not in session:
@@ -149,6 +148,10 @@ def signup():
     for field in required_fields:
         if not data.get(field):
             return jsonify({"message": f"Missing required field: {field}"}), 400
+
+    # Check if email contains "zf"
+    if "zf" not in data["officialEmail"]:
+        return jsonify({"message": "Please use a valid ZF email address."}), 400
 
     # Hash the password
     hashed_password = bcrypt.hashpw(data["password"].encode('utf-8'), bcrypt.gensalt())
